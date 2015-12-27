@@ -20,48 +20,40 @@ type Rule struct {
 	Env         []string
 }
 
+func redirect(dst string, src io.Reader) (err error) {
+	go func() {
+		outfile, err := os.Create(dst)
+		if err != nil {
+			return
+		}
+		defer outfile.Close()
+
+		writer := bufio.NewWriter(outfile)
+		defer writer.Flush()
+
+		io.Copy(writer, src)
+	}()
+	return
+}
+
 func Monitor(rule Rule) {
-	for {
 	c := exec.Command(rule.Args[0], rule.Args[1:]...)
 	if rule.WorkingDir != "" {
 		c.Dir = rule.WorkingDir
 	}
 
 	c.Env = rule.Env
-
-	util.Dump(c.Path)
-	util.Dump(c.Args)
-	util.Dump(c.Env)
-	util.Dump(c.Dir)
 	f, e, err := pty.Start2(c)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 	}
 
 	if (rule.LogStdout != "") {
-		outfile, err := os.Create(rule.LogStdout)
-		if err != nil {
-			panic(err)
-		}
-		defer outfile.Close()
-
-		writer := bufio.NewWriter(outfile)
-		defer writer.Flush()
-
-		go io.Copy(writer, f)
+		redirect(rule.LogStdout, f)
 	}
 
 	if (rule.LogStderr != "") {
-		outfile, err := os.Create(rule.LogStderr)
-		if err != nil {
-			panic(err)
-		}
-		defer outfile.Close()
-
-		writer := bufio.NewWriter(outfile)
-		defer writer.Flush()
-
-		go io.Copy(writer, e)
+		redirect(rule.LogStderr, e)
 	}
 
 	util.Dump(c.Process.Pid)
@@ -86,27 +78,9 @@ func Monitor(rule Rule) {
 			util.Dump(state)
 		}
 	}
-	// }()
-
-	// // go func() {
-	// 	for {
-	// 		buf := make([]byte, 1024 * 1024)
-	// 		n, err := f.Read(buf)
-	// 		if err != nil && err != io.EOF {
-	// 			fmt.Fprintf(os.Stderr, "? read error: %s", err)
-	// 			return
-	// 		}
-
-	// 		if n > 0 {
-	// 			fmt.Printf("stdout:%s", buf[0:n])
-	// 		} else {
-	// 			time.Sleep(16 * time.Millisecond)
-	// 		}
-	// 	}
-	// // }()
 
 
-	}
+
 
 	func main() {
 		rule := Rule{}
