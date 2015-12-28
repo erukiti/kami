@@ -1,19 +1,23 @@
 # Kami
 
-process monitor. inspired by God.rb
+process monitor. inspired by [God.rb](http://godrb.com/)
 
-※まだ作り始めです
+## License
 
-## github issue に移す
+Apache License 2.0
 
-* [x] working directory
-* [x] log (stdout, stderr)
-  - [ ] callback にする？
-  - [ ] redirect to file
-* [x] 環境変数
-* [ ] restart
-* ログ
+```
+Copyright 2015 SASAKI, Shunsuke. All rights reserved.
 
-* Monitor
-  - JSONを渡したらその内容でプロセスを作成監視する
-  - [ ] monitor を制御する方法は？
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
