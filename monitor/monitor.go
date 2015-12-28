@@ -73,6 +73,7 @@ func (m *Monitor) run(rule Rule) {
 	var err error
 	go func() {
 		for {
+			log.Println(10)
 			c := exec.Command(rule.Args[0], rule.Args[1:]...)
 			if rule.WorkingDir != "" {
 				c.Dir = rule.WorkingDir
@@ -80,12 +81,15 @@ func (m *Monitor) run(rule Rule) {
 
 			c.Env = m.env
 
+			log.Println(11)
 			m.stdout, m.stderr, err = pty.Start2(c)
+			log.Println(111)
 			if err != nil {
 				log.Printf("%s exec failed %s\n", c.Path, err)
 				return
 			}
 
+			log.Println(12)
 			if rule.LogDirStdout != "" {
 				m.redirect(rule.LogDirStdout, m.stdout)
 			}
@@ -94,9 +98,11 @@ func (m *Monitor) run(rule Rule) {
 				m.redirect(rule.LogDirStderr, m.stderr)
 			}
 
+			log.Println(13)
 			m.Pid = c.Process.Pid
 
 			state, err := c.Process.Wait()
+			log.Println(14)
 			if err != nil {
 				log.Printf("failed. %s\n", err)
 				return
@@ -116,6 +122,7 @@ func Create(rule Rule) (m *Monitor, err error) {
 	m.name = rule.Name
 	m.env = append(os.Environ(), rule.Env...)
 
+	log.Println("monitor Create")
 	m.run(rule)
 
 	return m, nil

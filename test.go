@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"encoding/json"
 	"github.com/erukiti/kami/monitor"
 	"log"
 	"os"
@@ -27,23 +26,11 @@ import (
 	// "github.com/erukiti/go-util"
 )
 
-func yaoyorozu(args []string) {
-	logWriter, _ := os.OpenFile("/Users/erukiti/log.txt", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+func main() {
+	logWriter, _ := os.OpenFile("/dev/stdout", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	log.SetOutput(logWriter)
 
-	var rules []monitor.Rule
-	err := json.Unmarshal([]byte(args[0]), &rules)
-	if err != nil {
-		var rule monitor.Rule
-		err := json.Unmarshal([]byte(args[0]), &rule)
-		if err != nil {
-			log.Println("JSON error")
-			log.Println(args[0])
-			os.Exit(1)
-		}
-
-		rules = []monitor.Rule{rule}
-	}
+	log.Println(1)
 
 	// signal.Ignore(syscall.SIGCHLD)
 	syscall.Close(0)
@@ -51,13 +38,12 @@ func yaoyorozu(args []string) {
 	syscall.Close(2)
 	// syscall.Setsid()
 	syscall.Umask(022)
-	// syscall.Chdir("/")
+	syscall.Chdir("/")
 
-	for _, rule := range rules {
-		log.Printf("start process %s\n", rule.Name)
-		log.Println(rule.Args)
-		monitor.Create(rule)
-	}
+	rule := monitor.Rule{}
+	rule.Args = []string{"ls", "-al"}
+	log.Println(2)
+	monitor.Create(rule)
 
 	log.Println("hoge")
 
