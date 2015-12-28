@@ -17,13 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/erukiti/kami/monitor"
 	"log"
 	"os"
 	"os/exec"
-	"github.com/erukiti/kami/monitor"
-	"encoding/json"
 )
 
 func main() {
@@ -46,6 +46,8 @@ func main() {
 		fs := flag.NewFlagSet("start", flag.ExitOnError)
 		name := fs.String("name", "", "process name")
 		dir := fs.String("dir", "", "working directory")
+		dirStdout := fs.String("stdout", "", "stdout log directory")
+		dirStderr := fs.String("stderr", "", "stderr log directory")
 		fs.Parse(args[1:])
 
 		startArgs := fs.Args()
@@ -66,6 +68,14 @@ func main() {
 			rule.WorkingDir = *dir
 		}
 
+		if dirStdout != nil && *dirStdout != "" {
+			rule.LogDirStdout = *dirStdout
+		}
+
+		if dirStderr != nil && *dirStderr != "" {
+			rule.LogDirStderr = *dirStderr
+		}
+
 		rule.Args = startArgs
 
 		jsonData, err := json.Marshal(rule)
@@ -74,6 +84,5 @@ func main() {
 			fmt.Println(err)
 		}
 	}
-
 
 }

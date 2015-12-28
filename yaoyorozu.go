@@ -17,18 +17,18 @@ limitations under the License.
 package main
 
 import (
-    "time"
-    "log"
-    "os"
-    "os/signal"
-    "syscall"
-    "encoding/json"
+	"encoding/json"
 	"github.com/erukiti/kami/monitor"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 	// "github.com/erukiti/go-util"
 )
 
 func yaoyorozu(args []string) {
-	logWriter, _ := os.OpenFile("/Users/erukiti/log.txt", os.O_WRONLY | os.O_APPEND | os.O_CREATE, 0666)
+	logWriter, _ := os.OpenFile("/Users/erukiti/log.txt", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	log.SetOutput(logWriter)
 
 	var rules []monitor.Rule
@@ -64,8 +64,5 @@ func yaoyorozu(args []string) {
 	for {
 		time.Sleep(1000 * time.Millisecond)
 	}
-
-
-
 
 }

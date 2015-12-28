@@ -17,14 +17,14 @@ limitations under the License.
 package monitor
 
 import (
+	"bufio"
+	"fmt"
+	"github.com/erukiti/go-util"
 	"github.com/erukiti/pty"
 	"io"
-	"fmt"
 	"log"
 	"os"
-	"bufio"
 	"os/exec"
-	"github.com/erukiti/go-util"
 )
 
 type Rule struct {
@@ -71,7 +71,7 @@ func (m *Monitor) redirect(dstDir string, src io.Reader) {
 
 func (m *Monitor) run(rule Rule) {
 	var err error
-	go func (){
+	go func() {
 		for {
 			c := exec.Command(rule.Args[0], rule.Args[1:]...)
 			if rule.WorkingDir != "" {
@@ -80,19 +80,17 @@ func (m *Monitor) run(rule Rule) {
 
 			c.Env = m.env
 
-			log.Printf("start %s\n", c.Path)
-
 			m.stdout, m.stderr, err = pty.Start2(c)
 			if err != nil {
-				log.Printf("failed %s\n", err)
+				log.Printf("%s exec failed %s\n", c.Path, err)
 				return
 			}
 
-			if (rule.LogDirStdout != "") {
+			if rule.LogDirStdout != "" {
 				m.redirect(rule.LogDirStdout, m.stdout)
 			}
 
-			if (rule.LogDirStderr != "") {
+			if rule.LogDirStderr != "" {
 				m.redirect(rule.LogDirStderr, m.stderr)
 			}
 
