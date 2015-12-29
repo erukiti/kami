@@ -32,11 +32,18 @@ type RunConf struct {
 }
 
 
-func dispatch(rule monitor.Rule) {
+func dispatch(logFile *string, rule monitor.Rule) {
 	var err error
+	var cmd *exec.Cmd
+
 	jsonData, err := json.Marshal(rule)
-	cmd := exec.Command(os.Args[0], "daemon", string(jsonData[:]))
-	if err = cmd.Start(); err != nil {
+	if logFile != nil && *logFile != "" {
+		cmd = exec.Command(os.Args[0], "--log", *logFile, "daemon", string(jsonData[:]))
+	} else {
+		cmd = exec.Command(os.Args[0], "daemon", string(jsonData[:]))
+	}
+	err = cmd.Start()
+	if err != nil {
 		log.Println(err)
 	}
 }
@@ -47,9 +54,10 @@ func startOptParse(args []string) (*monitor.Rule, error) {
 	dir := fs.String("dir", "", "working directory")
 	dirStdout := fs.String("stdout", "", "stdout log directory")
 	dirStderr := fs.String("stderr", "", "stderr log directory")
+	isRestart := fs.Bool("restart", true, "restart mode")
 	// isDryRun := flag.Bool("dry", false, "dry run mode.")
 
-	fs.Parse(args[1:])
+	fs.Parse(args)
 
 	startArgs := fs.Args()
 
@@ -77,12 +85,19 @@ func startOptParse(args []string) (*monitor.Rule, error) {
 	}
 
 	rule.Args = startArgs
+	if (isRestart != nil) {
+		rule.IsRestart = *isRestart
+	} else {
+		rule.IsRestart = true
+	}
 
 	return &rule, nil
 }
 
 func main() {
 	var err error
+
+	log.SetFlags(log.LstdFlags|log.Lshortfile)
 
 	logFile := flag.String("log", "", "log file")
 	flag.Parse()
@@ -114,7 +129,7 @@ func main() {
 		if err != nil {
 			log.Println(err)
 		} else {
-			dispatch(*rule)
+			dispatch(logFile, *rule)
 		}
 	}
 }

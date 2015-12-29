@@ -25,7 +25,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	// "strings"
+	"strings"
 )
 
 type Rule struct {
@@ -35,6 +35,7 @@ type Rule struct {
 	LogDirStdout string
 	LogDirStderr string
 	Env          []string
+	IsRestart    bool
 }
 
 type Opt struct {
@@ -46,23 +47,25 @@ type Opt struct {
 type Monitor struct {
 	name   string
 	env    []string
-	Pid    int
+	pid    int
 	stdout io.Reader
 	stderr io.Reader
 }
 
 func (m *Monitor) redirect(dstDir string, src io.Reader) {
 	go func() {
-		dst := fmt.Sprintf("%s/%s-%d.log", dstDir, m.name, m.Pid)
-		log.Printf("log: %s\n", dst)
-		outfile, err := os.Create(dst)
+		// pid := os.Getpid()
+		dst := fmt.Sprintf("%s/%s.log", dstDir, m.name)
+		log.Printf("output: %s\n", dst)
+		f, err := os.OpenFile(dst, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+
 		if err != nil {
 			log.Printf("faild. %s\n", err)
 			return
 		}
-		defer outfile.Close()
+		defer f.Close()
 
-		writer := bufio.NewWriter(outfile)
+		writer := bufio.NewWriter(f)
 		defer writer.Flush()
 
 		io.Copy(writer, src)
@@ -74,7 +77,7 @@ func (m *Monitor) run(rule Rule) {
 	var err error
 	go func() {
 		for {
-			log.Println(10)
+			log.Printf("try to start process. %s", rule.Args[0])
 			c := exec.Command(rule.Args[0], rule.Args[1:]...)
 			if rule.WorkingDir != "" {
 				c.Dir = rule.WorkingDir
@@ -82,15 +85,18 @@ func (m *Monitor) run(rule Rule) {
 
 			c.Env = m.env
 
-			log.Println(11)
+			log.Println("try to pty.Start2.")
 			m.stdout, m.stderr, err = pty.Start2(c)
-			log.Println(111)
+
+			log.Printf("exec %s %s\n", c.Path, strings.Join(c.Args, " "))
+
 			if err != nil {
 				log.Printf("%s exec failed %s\n", c.Path, err)
 				return
 			}
 
-			log.Println(12)
+			m.pid = c.Process.Pid
+
 			if rule.LogDirStdout != "" {
 				m.redirect(rule.LogDirStdout, m.stdout)
 			}
@@ -99,19 +105,23 @@ func (m *Monitor) run(rule Rule) {
 				m.redirect(rule.LogDirStderr, m.stderr)
 			}
 
-			log.Println(13)
-			m.Pid = c.Process.Pid
+
+			log.Println("process.wait.")
 
 			state, err := c.Process.Wait()
-			log.Println(14)
+			log.Println("get result.")
 			if err != nil {
 				log.Printf("failed. %s\n", err)
 				return
 			} else if state.Exited() {
-				// FIXME restart しないモードを追加する
 				log.Println("exited.")
-				log.Println("restart.")
-				continue
+
+				if (rule.IsRestart) {
+					log.Println("restart.")
+					continue
+				} else {
+					return
+				}
 			}
 			util.Dump(state)
 		}

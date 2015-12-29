@@ -22,7 +22,7 @@ import (
 	"log"
 	"os"
 	// "os/signal"
-	"syscall"
+	// "syscall"
 	"time"
 	// "github.com/erukiti/go-util"
 )
@@ -43,20 +43,20 @@ func yaoyorozu(args []string) {
 	}
 
 	// signal.Ignore(syscall.SIGCHLD)
-	syscall.Close(0)
-	syscall.Close(1)
-	syscall.Close(2)
+	// syscall.Close(0)
+	// syscall.Close(1)
+	// syscall.Close(2)
 	// syscall.Setsid()
-	syscall.Umask(022)
+	// syscall.Umask(022)
 	// syscall.Chdir("/")
+
+	log.Println("process monitor daemon start.")
 
 	for _, rule := range rules {
 		log.Printf("start process %s\n", rule.Name)
 		log.Println(rule.Args)
 		monitor.Create(rule)
 	}
-
-	log.Println("hoge")
 
 	for {
 		time.Sleep(1000 * time.Millisecond)
