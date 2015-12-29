@@ -20,17 +20,29 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/erukiti/go-util"
 	"github.com/erukiti/kami/monitor"
+	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 )
+
+const PidFile = "~/.kami/pid"
+
+type Command struct {
+	Op    string
+	Rules []monitor.Rule
+}
 
 type RunConf struct {
 	rules []monitor.Rule
 }
 
-func dispatch(cwd string, logFile *string, rule monitor.Rule) {
+func dispatchDaemon(cwd string, logFile *string, rule monitor.Rule) {
 	var err error
 	var cmd *exec.Cmd
 
@@ -44,6 +56,80 @@ func dispatch(cwd string, logFile *string, rule monitor.Rule) {
 	if err != nil {
 		log.Println(err)
 	}
+
+}
+
+func readPidFile() (int, error) {
+	content, err := ioutil.ReadFile(util.PathResolv("/", PidFile))
+	if err != nil {
+		return -1, err
+	} else {
+		pid, err := strconv.Atoi(string(content))
+		if err != nil {
+			return -1, err
+		} else {
+			return pid, nil
+		}
+	}
+}
+
+func writePidFile() error {
+	pidFile := util.PathResolv("/", PidFile)
+	pidPath, _ := filepath.Split(pidFile)
+	os.MkdirAll(pidPath, 0777)
+	return ioutil.WriteFile(pidFile, []byte(fmt.Sprintf("%d", os.Getpid())), 0666)
+}
+
+func dispatch(cwd string, logFile *string, rule monitor.Rule) {
+	var err error
+
+	pid, err := readPidFile()
+	log.Println(pid)
+	if err != nil && !os.IsNotExist(err) {
+		log.Println(err)
+	} else if err == nil {
+		socketFile := fmt.Sprintf("/tmp/kami.%d.sock", pid)
+		proc, err := os.FindProcess(pid)
+		log.Println(proc)
+		if err != nil {
+			log.Printf("find process error: %v\n", err)
+			_, err := os.Stat(socketFile)
+			if err == nil || !os.IsNotExist(err) {
+				os.Remove(socketFile)
+			}
+			pid = -1
+		} else {
+			c, err := net.Dial("unix", socketFile)
+			log.Println(c)
+			if err != nil {
+				log.Printf("socket error: %v\n", err)
+				err := proc.Kill()
+				if err != nil {
+					log.Printf("process kill error: %v\n", err)
+				}
+				pid = -1
+			} else {
+				defer c.Close()
+
+				command := Command{"start", []monitor.Rule{rule}}
+				jsonData, err := json.Marshal(command)
+				if err != nil {
+					log.Printf("failed %v\n", err)
+				} else {
+					log.Println(string(jsonData))
+					_, err := c.Write(jsonData)
+					if err != nil {
+						log.Printf("socket write error: %v\n", err)
+					} else {
+						log.Println("hoge")
+						return
+					}
+				}
+			}
+		}
+	}
+
+	dispatchDaemon(cwd, logFile, rule)
 }
 
 func startOptParse(args []string) (*monitor.Rule, error) {

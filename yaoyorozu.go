@@ -20,12 +20,20 @@ import (
 	"encoding/json"
 	"github.com/erukiti/kami/monitor"
 	"log"
+	"net"
 	"os"
 	// "os/signal"
+	"fmt"
 	"syscall"
 	"time"
 	// "github.com/erukiti/go-util"
 )
+
+func startProcess(rule monitor.Rule, cwd string) {
+	log.Printf("start process %s\n", rule.Name)
+	log.Println(rule.Args)
+	monitor.Create(rule, cwd)
+}
 
 func yaoyorozu(cwd string, args []string) {
 	var rules []monitor.Rule
@@ -51,11 +59,47 @@ func yaoyorozu(cwd string, args []string) {
 	syscall.Chdir("/")
 
 	log.Println("process monitor daemon start.")
+	writePidFile()
+
+	go func() {
+		socketFile := fmt.Sprintf("/tmp/kami.%d.sock", os.Getpid())
+		l, err := net.Listen("unix", socketFile)
+		if err != nil {
+			log.Fatal("listen error:", err)
+		}
+		defer os.Remove("/tmp/kami.sock")
+
+		for {
+			fd, err := l.Accept()
+			if err != nil {
+				log.Fatal("accept error:", err)
+			}
+			go func(fd net.Conn) {
+				var command Command
+				buf := make([]byte, 1024)
+				nr, err := fd.Read(buf)
+				if err != nil {
+					log.Printf("%v\n", err)
+				}
+				json.Unmarshal(buf[:nr], &command)
+				switch command.Op {
+				case "start":
+					for _, rule := range command.Rules {
+						log.Println("start")
+						startProcess(rule, cwd)
+					}
+				case "status":
+					log.Println("status")
+
+				case "stopall":
+					os.Exit(0)
+				}
+			}(fd)
+		}
+	}()
 
 	for _, rule := range rules {
-		log.Printf("start process %s\n", rule.Name)
-		log.Println(rule.Args)
-		monitor.Create(rule, cwd)
+		startProcess(rule, cwd)
 	}
 
 	for {

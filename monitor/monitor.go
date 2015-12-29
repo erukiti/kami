@@ -25,9 +25,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	    "os/user"
 	"strings"
-	"path/filepath"
 )
 
 type Rule struct {
@@ -55,33 +53,8 @@ type Monitor struct {
 	stderr io.Reader
 }
 
-func pathResolv(base string, s string) string {
-	var err error
-	if s[0] == '~' {
-		a := strings.Split(s, "/")
-		var usr *user.User
-		if a[0] == "~" {
-			usr, err = user.Current()
-		} else {
-			usr, err = user.Lookup(a[0][1:])
-		}
-		if err != nil {
-			log.Printf("resolv error: %v\n", err)
-		} else {
-			a[0] = usr.HomeDir
-			return filepath.Join(a...)
-		}
-	}
-
-	if (filepath.IsAbs(s)) {
-		return s
-	}
-
-	return filepath.Join(base, s)
-}
-
 func (m *Monitor) pathResolv(s string) string {
-	return pathResolv(m.base, s)
+	return util.PathResolv(m.base, s)
 
 }
 
@@ -118,7 +91,7 @@ func (m *Monitor) run(rule Rule) {
 
 			c.Env = m.env
 
-			log.Println("try to pty.Start2.")
+			// log.Println("try to pty.Start2.")
 			m.stdout, m.stderr, err = pty.Start2(c)
 
 			log.Printf("exec %s %s\n", c.Path, strings.Join(c.Args, " "))
@@ -163,7 +136,7 @@ func (m *Monitor) run(rule Rule) {
 func Create(rule Rule, cwd string) (m *Monitor, err error) {
 	m = &Monitor{}
 	m.name = rule.Name
-	m.base = pathResolv(cwd, rule.WorkingDir)
+	m.base = util.PathResolv(cwd, rule.WorkingDir)
 	m.env = append(os.Environ(), rule.Env...)
 
 	log.Println("monitor Create")
