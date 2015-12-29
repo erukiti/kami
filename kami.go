@@ -27,7 +27,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 )
 
@@ -74,9 +73,7 @@ func readPidFile() (int, error) {
 }
 
 func writePidFile() error {
-	pidFile := util.PathResolv("/", PidFile)
-	pidPath, _ := filepath.Split(pidFile)
-	os.MkdirAll(pidPath, 0777)
+	pidFile := util.PathResolvWithMkdirAll("/", PidFile)
 	return ioutil.WriteFile(pidFile, []byte(fmt.Sprintf("%d", os.Getpid())), 0666)
 }
 
@@ -180,10 +177,11 @@ func startOptParse(args []string) (*monitor.Rule, error) {
 
 func main() {
 	var err error
+	_ = err
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	logFile := flag.String("log", "", "log file")
+	logFile := flag.String("log", "~/.kami/log.txt", "log file")
 	flag.Parse()
 
 	args := flag.Args()
@@ -193,8 +191,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	cwd, errCwd := os.Getwd()
+	if errCwd != nil {
+		cwd = "/"
+	}
+
 	if logFile != nil && *logFile != "" {
-		logWriter, err := os.OpenFile(*logFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		s := util.PathResolvWithMkdirAll(cwd, *logFile)
+		logWriter, err := os.OpenFile(s, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
 			fmt.Printf("log file error: %s\n", err)
 		} else {
@@ -202,11 +206,9 @@ func main() {
 		}
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
+	if errCwd != nil {
 		log.Println("failed get current working directory.")
-		log.Printf("%v\n", err)
-		cwd = "/"
+		log.Printf("%v\n", errCwd)
 	}
 
 	switch args[0] {

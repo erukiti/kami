@@ -67,7 +67,6 @@ func yaoyorozu(cwd string, args []string) {
 		if err != nil {
 			log.Fatal("listen error:", err)
 		}
-		defer os.Remove("/tmp/kami.sock")
 
 		for {
 			fd, err := l.Accept()
@@ -92,6 +91,7 @@ func yaoyorozu(cwd string, args []string) {
 					log.Println("status")
 
 				case "stopall":
+					os.Remove(socketFile)
 					os.Exit(0)
 				}
 			}(fd)
