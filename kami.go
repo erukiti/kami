@@ -27,12 +27,10 @@ import (
 )
 
 type RunConf struct {
-
 	rules []monitor.Rule
 }
 
-
-func dispatch(logFile *string, rule monitor.Rule) {
+func dispatch(cwd string, logFile *string, rule monitor.Rule) {
 	var err error
 	var cmd *exec.Cmd
 
@@ -85,7 +83,7 @@ func startOptParse(args []string) (*monitor.Rule, error) {
 	}
 
 	rule.Args = startArgs
-	if (isRestart != nil) {
+	if isRestart != nil {
 		rule.IsRestart = *isRestart
 	} else {
 		rule.IsRestart = true
@@ -97,7 +95,7 @@ func startOptParse(args []string) (*monitor.Rule, error) {
 func main() {
 	var err error
 
-	log.SetFlags(log.LstdFlags|log.Lshortfile)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	logFile := flag.String("log", "", "log file")
 	flag.Parse()
@@ -118,18 +116,23 @@ func main() {
 		}
 	}
 
-	_ = err
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Println("failed get current working directory.")
+		log.Printf("%v\n", err)
+		cwd = "/"
+	}
 
 	switch args[0] {
 	case "daemon":
-		yaoyorozu(args[1:])
+		yaoyorozu(cwd, args[1:])
 
 	case "start":
 		rule, err := startOptParse(args[1:])
 		if err != nil {
 			log.Println(err)
 		} else {
-			dispatch(logFile, *rule)
+			dispatch(cwd, logFile, *rule)
 		}
 	}
 }

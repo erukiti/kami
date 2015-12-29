@@ -25,7 +25,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	    "os/user"
 	"strings"
+	"path/filepath"
 )
 
 type Rule struct {
@@ -45,11 +47,42 @@ type Opt struct {
 }
 
 type Monitor struct {
+	base   string
 	name   string
 	env    []string
 	pid    int
 	stdout io.Reader
 	stderr io.Reader
+}
+
+func pathResolv(base string, s string) string {
+	var err error
+	if s[0] == '~' {
+		a := strings.Split(s, "/")
+		var usr *user.User
+		if a[0] == "~" {
+			usr, err = user.Current()
+		} else {
+			usr, err = user.Lookup(a[0][1:])
+		}
+		if err != nil {
+			log.Printf("resolv error: %v\n", err)
+		} else {
+			a[0] = usr.HomeDir
+			return filepath.Join(a...)
+		}
+	}
+
+	if (filepath.IsAbs(s)) {
+		return s
+	}
+
+	return filepath.Join(base, s)
+}
+
+func (m *Monitor) pathResolv(s string) string {
+	return pathResolv(m.base, s)
+
 }
 
 func (m *Monitor) redirect(dstDir string, src io.Reader) {
@@ -80,7 +113,7 @@ func (m *Monitor) run(rule Rule) {
 			log.Printf("try to start process. %s", rule.Args[0])
 			c := exec.Command(rule.Args[0], rule.Args[1:]...)
 			if rule.WorkingDir != "" {
-				c.Dir = rule.WorkingDir
+				c.Dir = m.pathResolv(rule.WorkingDir)
 			}
 
 			c.Env = m.env
@@ -98,13 +131,12 @@ func (m *Monitor) run(rule Rule) {
 			m.pid = c.Process.Pid
 
 			if rule.LogDirStdout != "" {
-				m.redirect(rule.LogDirStdout, m.stdout)
+				m.redirect(m.pathResolv(rule.LogDirStdout), m.stdout)
 			}
 
 			if rule.LogDirStderr != "" {
-				m.redirect(rule.LogDirStderr, m.stderr)
+				m.redirect(m.pathResolv(rule.LogDirStderr), m.stderr)
 			}
-
 
 			log.Println("process.wait.")
 
@@ -116,7 +148,7 @@ func (m *Monitor) run(rule Rule) {
 			} else if state.Exited() {
 				log.Println("exited.")
 
-				if (rule.IsRestart) {
+				if rule.IsRestart {
 					log.Println("restart.")
 					continue
 				} else {
@@ -128,9 +160,10 @@ func (m *Monitor) run(rule Rule) {
 	}()
 }
 
-func Create(rule Rule) (m *Monitor, err error) {
+func Create(rule Rule, cwd string) (m *Monitor, err error) {
 	m = &Monitor{}
 	m.name = rule.Name
+	m.base = pathResolv(cwd, rule.WorkingDir)
 	m.env = append(os.Environ(), rule.Env...)
 
 	log.Println("monitor Create")
