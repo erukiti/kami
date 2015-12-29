@@ -28,9 +28,6 @@ import (
 )
 
 func yaoyorozu(args []string) {
-	logWriter, _ := os.OpenFile("/Users/erukiti/log.txt", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
-	log.SetOutput(logWriter)
-
 	var rules []monitor.Rule
 	err := json.Unmarshal([]byte(args[0]), &rules)
 	if err != nil {

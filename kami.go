@@ -26,14 +26,81 @@ import (
 	"os/exec"
 )
 
+type RunConf struct {
+
+	rules []monitor.Rule
+}
+
+
+func dispatch(rule monitor.Rule) {
+	var err error
+	jsonData, err := json.Marshal(rule)
+	cmd := exec.Command(os.Args[0], "daemon", string(jsonData[:]))
+	if err = cmd.Start(); err != nil {
+		log.Println(err)
+	}
+}
+
+func startOptParse(args []string) (*monitor.Rule, error) {
+	fs := flag.NewFlagSet("start", flag.ExitOnError)
+	name := fs.String("name", "", "process name")
+	dir := fs.String("dir", "", "working directory")
+	dirStdout := fs.String("stdout", "", "stdout log directory")
+	dirStderr := fs.String("stderr", "", "stderr log directory")
+	// isDryRun := flag.Bool("dry", false, "dry run mode.")
+
+	fs.Parse(args[1:])
+
+	startArgs := fs.Args()
+
+	if len(startArgs) == 0 {
+		return nil, fmt.Errorf("need command.")
+	}
+
+	rule := monitor.Rule{}
+	if name != nil && *name != "" {
+		rule.Name = *name
+	} else {
+		rule.Name = startArgs[0]
+	}
+
+	if dir != nil && *dir != "" {
+		rule.WorkingDir = *dir
+	}
+
+	if dirStdout != nil && *dirStdout != "" {
+		rule.LogDirStdout = *dirStdout
+	}
+
+	if dirStderr != nil && *dirStderr != "" {
+		rule.LogDirStderr = *dirStderr
+	}
+
+	rule.Args = startArgs
+
+	return &rule, nil
+}
+
 func main() {
 	var err error
 
+	logFile := flag.String("log", "", "log file")
 	flag.Parse()
+
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Println("usage.")
+		flag.Usage()
+
 		os.Exit(1)
+	}
+
+	if logFile != nil && *logFile != "" {
+		logWriter, err := os.OpenFile(*logFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			fmt.Printf("log file error: %s\n", err)
+		} else {
+			log.SetOutput(logWriter)
+		}
 	}
 
 	_ = err
@@ -43,46 +110,11 @@ func main() {
 		yaoyorozu(args[1:])
 
 	case "start":
-		fs := flag.NewFlagSet("start", flag.ExitOnError)
-		name := fs.String("name", "", "process name")
-		dir := fs.String("dir", "", "working directory")
-		dirStdout := fs.String("stdout", "", "stdout log directory")
-		dirStderr := fs.String("stderr", "", "stderr log directory")
-		fs.Parse(args[1:])
-
-		startArgs := fs.Args()
-
-		if len(startArgs) == 0 {
-			log.Println("need command")
-			os.Exit(1)
-		}
-
-		rule := monitor.Rule{}
-		if name != nil && *name != "" {
-			rule.Name = *name
+		rule, err := startOptParse(args[1:])
+		if err != nil {
+			log.Println(err)
 		} else {
-			rule.Name = startArgs[0]
-		}
-
-		if dir != nil && *dir != "" {
-			rule.WorkingDir = *dir
-		}
-
-		if dirStdout != nil && *dirStdout != "" {
-			rule.LogDirStdout = *dirStdout
-		}
-
-		if dirStderr != nil && *dirStderr != "" {
-			rule.LogDirStderr = *dirStderr
-		}
-
-		rule.Args = startArgs
-
-		jsonData, err := json.Marshal(rule)
-		cmd := exec.Command(os.Args[0], "daemon", string(jsonData[:]))
-		if err = cmd.Start(); err != nil {
-			fmt.Println(err)
+			dispatch(*rule)
 		}
 	}
-
 }
