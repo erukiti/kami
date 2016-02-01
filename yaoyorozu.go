@@ -26,7 +26,8 @@ import (
 	"fmt"
 	"syscall"
 	"time"
-	// "github.com/erukiti/go-util"
+	"flag"
+	"github.com/erukiti/go-util"
 )
 
 func startProcess(rule monitor.Rule, cwd string) {
@@ -36,21 +37,23 @@ func startProcess(rule monitor.Rule, cwd string) {
 }
 
 func yaoyorozu(cwd string, args []string) {
-	var rules []monitor.Rule
-	err := json.Unmarshal([]byte(args[0]), &rules)
-	if err != nil {
-		var rule monitor.Rule
-		err := json.Unmarshal([]byte(args[0]), &rule)
-		if err != nil {
-			log.Println("JSON error")
-			log.Println(args[0])
-			os.Exit(1)
-		}
+	fs := flag.NewFlagSet("daemon", flag.ExitOnError)
+	logFile := fs.String("log", "", "log file")
 
-		rules = []monitor.Rule{rule}
+	fs.Parse(args)
+
+	if logFile != nil && *logFile != "" {
+		s := util.PathResolvWithMkdirAll(cwd, *logFile)
+		logWriter, err := os.OpenFile(s, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+		if err != nil {
+			log.Printf("log file error: %s\n", err)
+		} else {
+			log.SetOutput(logWriter)
+		}
 	}
 
 	// signal.Ignore(syscall.SIGCHLD)
+	// signal.Ignore(syscall.Signal(0))
 	syscall.Close(0)
 	syscall.Close(1)
 	syscall.Close(2)
@@ -58,7 +61,7 @@ func yaoyorozu(cwd string, args []string) {
 	syscall.Umask(022)
 	syscall.Chdir("/")
 
-	log.Println("process monitor daemon start.")
+	log.Printf("process monitor daemon start. %d", os.Getpid())
 	writePidFile()
 
 	go func() {
@@ -69,13 +72,15 @@ func yaoyorozu(cwd string, args []string) {
 		}
 
 		for {
+			log.Println("accept.")
 			fd, err := l.Accept()
 			if err != nil {
 				log.Fatal("accept error:", err)
 			}
 			go func(fd net.Conn) {
+				log.Println("[debug] **")
 				var command Command
-				buf := make([]byte, 1024)
+				buf := make([]byte, 10240)
 				nr, err := fd.Read(buf)
 				if err != nil {
 					log.Printf("%v\n", err)
@@ -86,24 +91,24 @@ func yaoyorozu(cwd string, args []string) {
 					for _, rule := range command.Rules {
 						log.Println("start")
 						startProcess(rule, cwd)
+						log.Println("process started")
 					}
+					log.Println("*")
 				case "status":
 					log.Println("status")
 
 				case "stopall":
+					log.Println("stopall")
 					os.Remove(socketFile)
 					os.Exit(0)
 				}
+				log.Println(".")
 			}(fd)
 		}
 	}()
 
-	for _, rule := range rules {
-		startProcess(rule, cwd)
-	}
-
 	for {
 		time.Sleep(1000 * time.Millisecond)
 	}
-
+	log.Println("hoge")
 }

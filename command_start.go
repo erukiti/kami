@@ -17,13 +17,12 @@ limitations under the License.
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"github.com/erukiti/kami/monitor"
 )
 
 func commandStart(args []string) error {
-	opts := []string{}
+	opts := []string{"daemon"}
 
 	fs := flag.NewFlagSet("start", flag.ExitOnError)
 	name := fs.String("name", "", "process name")
@@ -69,15 +68,10 @@ func commandStart(args []string) error {
 		rule.IsRestart = true
 	}
 
-	jsonData, err := json.Marshal(rule)
-	if err != nil {
-		return err
-	}
-
 	if logFile != nil && *logFile != "" {
 		opts = append(opts, "--log", *logFile)
 	}
-	opts = append(opts, string(jsonData[:]))
+
 	dispatch(opts, rule)
 	return nil
 }
