@@ -45,18 +45,19 @@ type Opt struct {
 }
 
 type Monitor struct {
-	base   string
-	name   string
-	env    []string
-	pid    int
-	stdout io.Reader
-	stderr io.Reader
+	name         string
+	workingDir   string
+	env          []string
+	command      string
+	args         []string
+	isRestart    bool
+	logDirStdout string
+	logDirStderr string
 }
 
 func (m *Monitor) pathResolv(s string) string {
 	// FIXME: WithMkdir
-	return util.PathResolv(m.base, s)
-
+	return util.PathResolv(m.workingDir, s)
 }
 
 func (m *Monitor) redirect(dstDir string, src io.Reader) {
@@ -81,19 +82,16 @@ func (m *Monitor) redirect(dstDir string, src io.Reader) {
 }
 
 func (m *Monitor) run(rule Rule) {
-	var err error
 	go func() {
 		for {
-			log.Printf("try to start process. %s", rule.Args[0])
-			c := exec.Command(rule.Args[0], rule.Args[1:]...)
-			if rule.WorkingDir != "" {
-				c.Dir = m.pathResolv(rule.WorkingDir)
-			}
-
+			var err error
+			log.Printf("try to start process. %s", m.command)
+			c := exec.Command(m.command, m.args...)
+			c.Dir = m.workingDir
 			c.Env = m.env
 
 			// log.Println("try to pty.Start2.")
-			m.stdout, m.stderr, err = pty.Start2(c)
+			f, e, err := pty.Start2(c)
 
 			log.Printf("exec %s %s\n", c.Path, strings.Join(c.Args, " "))
 
@@ -102,14 +100,14 @@ func (m *Monitor) run(rule Rule) {
 				return
 			}
 
-			m.pid = c.Process.Pid
+			// m.pid = c.Process.Pid
 
 			if rule.LogDirStdout != "" {
-				m.redirect(m.pathResolv(rule.LogDirStdout), m.stdout)
+				m.redirect(m.pathResolv(m.logDirStdout), f)
 			}
 
 			if rule.LogDirStderr != "" {
-				m.redirect(m.pathResolv(rule.LogDirStderr), m.stderr)
+				m.redirect(m.pathResolv(m.logDirStderr), e)
 			}
 
 			log.Println("process.wait.")
@@ -117,7 +115,7 @@ func (m *Monitor) run(rule Rule) {
 			state, err := c.Process.Wait()
 			log.Println("get result.")
 			if err != nil {
-				log.Printf("failed. %s\n", err)
+				log.Printf("failed. %v\n", err)
 				return
 			} else if state.Exited() {
 				log.Println("exited.")
@@ -137,8 +135,13 @@ func (m *Monitor) run(rule Rule) {
 func Create(rule Rule, cwd string) (m *Monitor, err error) {
 	m = &Monitor{}
 	m.name = rule.Name
-	m.base = util.PathResolv(cwd, rule.WorkingDir)
+	m.workingDir = util.PathResolv(cwd, rule.WorkingDir)
 	m.env = append(os.Environ(), rule.Env...)
+	m.command = rule.Args[0]
+	m.args = rule.Args[1:]
+	m.isRestart = rule.IsRestart
+	m.logDirStdout = rule.LogDirStdout
+	m.logDirStderr = rule.LogDirStderr
 
 	log.Println("monitor Create")
 	m.run(rule)
